@@ -1,14 +1,12 @@
 from flask import Flask, render_template, request, jsonify
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import (
-    NoTranscriptFound,
-    TranscriptsDisabled,
-    VideoUnavailable
-)
-import traceback
+import yt_dlp
+import tempfile
+import os
 import re
+import json
 
 app = Flask(__name__)
+
 
 def extract_video_id(url):
     patterns = [
@@ -36,35 +34,83 @@ def home():
 def transcript():
 
     try:
+
         data = request.get_json()
+
         url = data.get("url", "").strip()
 
-        video_id = extract_video_id(url)
-
-        if not video_id:
+        if not url:
             return jsonify({
                 "success": False,
-                "message": "Invalid YouTube URL."
+                "message": "Please enter a YouTube URL."
             })
 
-        api = YouTubeTranscriptApi()
+        with tempfile.TemporaryDirectory() as tempdir:
 
-        transcript = api.fetch(video_id)
+            ydl_opts = {
+                "skip_download": True,
+                "writesubtitles": True,
+                "writeautomaticsub": True,
+                "subtitleslangs": ["en", "en-US", "en-GB"],
+                "subtitlesformat": "vtt",
+                "outtmpl": os.path.join(tempdir, "%(id)s.%(ext)s"),
+                "quiet": True,
+                "no_warnings": True
+            }
 
-        text = "\n".join(
-            item.text for item in transcript
-        )
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
 
-        return jsonify({
-            "success": True,
-            "transcript": text
-        })
+                info = ydl.extract_info(url, download=False)
 
-    except Exception:
-        traceback.print_exc()
+                video_id = info["id"]
+
+                ydl.download([url])
+
+                transcript = ""
+
+                for file in os.listdir(tempdir):
+
+                    if file.endswith(".vtt"):
+
+                        with open(
+                            os.path.join(tempdir, file),
+                            "r",
+                            encoding="utf-8"
+                        ) as f:
+
+                            for line in f:
+
+                                line = line.strip()
+
+                                if (
+                                    "-->" in line
+                                    or line == ""
+                                    or line == "WEBVTT"
+                                ):
+                                    continue
+
+                                if line.startswith("<"):
+                                    continue
+
+                                transcript += line + "\n"
+
+                if transcript.strip() == "":
+                    return jsonify({
+                        "success": False,
+                        "message": "No transcript found."
+                    })
+
+                return jsonify({
+                    "success": True,
+                    "video_id": video_id,
+                    "transcript": transcript
+                })
+
+    except Exception as e:
+
         return jsonify({
             "success": False,
-            "message": traceback.format_exc()
+            "message": str(e)
         }), 500
 
 
