@@ -1,11 +1,11 @@
 from flask import Flask, render_template, request, jsonify
-import yt_dlp
-import tempfile
+import requests
 import os
 import re
-import json
 
 app = Flask(__name__)
+
+API_KEY = os.environ.get("sk_4gdcJi1O-dDha0MNaq27x1PeXudrjbBDdEcIwccNii4")
 
 
 def extract_video_id(url):
@@ -32,82 +32,57 @@ def home():
 
 @app.route("/api/transcript", methods=["POST"])
 def transcript():
-
     try:
-
         data = request.get_json()
-
         url = data.get("url", "").strip()
 
-        if not url:
+        video_id = extract_video_id(url)
+
+        if not video_id:
             return jsonify({
                 "success": False,
-                "message": "Please enter a YouTube URL."
+                "message": "Invalid YouTube URL."
             })
 
-        with tempfile.TemporaryDirectory() as tempdir:
+        endpoint = "https://transcriptapi.com/api/v2/youtube/transcript"
 
-            ydl_opts = {
-                "skip_download": True,
-                "writesubtitles": True,
-                "writeautomaticsub": True,
-                "subtitleslangs": ["en", "en-US", "en-GB"],
-                "subtitlesformat": "vtt",
-                "outtmpl": os.path.join(tempdir, "%(id)s.%(ext)s"),
-                "quiet": True,
-                "no_warnings": True
-            }
+        headers = {
+            "Authorization": f"Bearer {API_KEY}",
+            "Accept": "application/json"
+        }
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        params = {
+            "video_url": f"https://youtu.be/{video_id}",
+            "format": "json",
+            "include_timestamp": "true"
+        }
 
-                info = ydl.extract_info(url, download=False)
+        response = requests.get(
+            endpoint,
+            headers=headers,
+            params=params,
+            timeout=30
+        )
 
-                video_id = info["id"]
+        if response.status_code != 200:
+            return jsonify({
+                "success": False,
+                "message": response.text
+            })
 
-                ydl.download([url])
+        transcript = response.json()
 
-                transcript = ""
+        text = "\n".join(
+            item["text"]
+            for item in transcript
+        )
 
-                for file in os.listdir(tempdir):
-
-                    if file.endswith(".vtt"):
-
-                        with open(
-                            os.path.join(tempdir, file),
-                            "r",
-                            encoding="utf-8"
-                        ) as f:
-
-                            for line in f:
-
-                                line = line.strip()
-
-                                if (
-                                    "-->" in line
-                                    or line == ""
-                                    or line == "WEBVTT"
-                                ):
-                                    continue
-
-                                if line.startswith("<"):
-                                    continue
-
-                                transcript += line + "\n"
-
-                if transcript.strip() == "":
-                    return jsonify({
-                        "success": False,
-                        "message": "No transcript found."
-                    })
-
-                return jsonify({
-                    "success": True,
-                    "video_id": video_id,
-                    "transcript": transcript
-                })
+        return jsonify({
+            "success": True,
+            "transcript": text
+        })
 
     except Exception as e:
-
         return jsonify({
             "success": False,
             "message": str(e)
