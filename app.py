@@ -5,7 +5,7 @@ import re
 
 app = Flask(__name__)
 
-API_KEY = os.environ.get("sk_4gdcJi1O-dDha0MNaq27x1PeXudrjbBDdEcIwccNii4")
+API_KEY = os.environ.get(sk_4gdcJi1O-dDha0MNaq27x1PeXudrjbBDdEcIwccNii4)
 
 
 def extract_video_id(url):
