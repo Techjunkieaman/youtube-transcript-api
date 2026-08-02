@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Transcript Generator</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>YouTube Transcript Generator</h1>
+
+    <p class="subtitle">
+        Paste a YouTube video URL below and instantly generate its transcript.
+    </p>
+
+    <input
+        type="text"
+        id="url"
+        placeholder="https://youtube.com/watch?v=..."
+    >
+
+    <button onclick="getTranscript()">
+        Get Transcript
+    </button>
+
+    <textarea
+        id="result"
+        placeholder="Transcript will appear here..."
+    ></textarea>
+
+    <button onclick="copyTranscript()">
+        Copy Transcript
+    </button>
+
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
