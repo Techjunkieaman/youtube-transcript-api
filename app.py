@@ -1,10 +1,14 @@
 from flask import Flask, render_template, request, jsonify
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import (
+    NoTranscriptFound,
+    TranscriptsDisabled,
+    VideoUnavailable
+)
 import traceback
 import re
 
 app = Flask(__name__)
-
 
 def extract_video_id(url):
     patterns = [
@@ -32,16 +36,8 @@ def home():
 def transcript():
 
     try:
-
         data = request.get_json()
-
         url = data.get("url", "").strip()
-
-        if not url:
-            return jsonify({
-                "success": False,
-                "message": "Please enter a YouTube URL."
-            })
 
         video_id = extract_video_id(url)
 
@@ -51,31 +47,26 @@ def transcript():
                 "message": "Invalid YouTube URL."
             })
 
-        transcript = YouTubeTranscriptApi.get_transcript(
-            video_id,
-            languages=["en", "en-US", "en-GB", "hi", "auto"]
-        )
+        api = YouTubeTranscriptApi()
 
-        full_text = "\n".join(
-            item["text"] for item in transcript
+        transcript = api.fetch(video_id)
+
+        text = "\n".join(
+            item.text for item in transcript
         )
 
         return jsonify({
             "success": True,
-            "video_id": video_id,
-            "transcript": full_text,
-            "segments": transcript
+            "transcript": text
         })
 
-    except Exception as e:
-
+    except Exception:
         traceback.print_exc()
-
         return jsonify({
             "success": False,
-            "message": str(e)
+            "message": traceback.format_exc()
         }), 500
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)
