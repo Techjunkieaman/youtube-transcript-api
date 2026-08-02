@@ -5,7 +5,7 @@ import re
 
 app = Flask(__name__)
 
-API_KEY = os.environ.get(sk_4gdcJi1O-dDha0MNaq27x1PeXudrjbBDdEcIwccNii4)
+API_KEY = os.environ.get("TRANSCRIPT_API_KEY")
 
 
 def extract_video_id(url):
@@ -34,6 +34,7 @@ def home():
 def transcript():
     try:
         data = request.get_json()
+
         url = data.get("url", "").strip()
 
         video_id = extract_video_id(url)
@@ -68,18 +69,29 @@ def transcript():
             return jsonify({
                 "success": False,
                 "message": response.text
+            }), response.status_code
+
+        data = response.json()
+
+        if "transcript" not in data:
+            return jsonify({
+                "success": False,
+                "message": "No transcript returned by API."
             })
 
-        transcript = response.json()
+        transcript_items = data["transcript"]
 
-        text = "\n".join(
-            item["text"]
-            for item in transcript
+        transcript_text = "\n".join(
+            item.get("text", "")
+            for item in transcript_items
         )
 
         return jsonify({
             "success": True,
-            "transcript": text
+            "title": data.get("metadata", {}).get("title", ""),
+            "author": data.get("metadata", {}).get("author_name", ""),
+            "language": data.get("language", ""),
+            "transcript": transcript_text
         })
 
     except Exception as e:
