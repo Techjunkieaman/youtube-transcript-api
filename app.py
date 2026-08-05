@@ -1,12 +1,15 @@
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS  # <--- Added this import
 import requests
 import os
 import re
 
 app = Flask(__name__)
 
-API_KEY = os.environ.get("TRANSCRIPT_API_KEY")
+# <--- Added CORS to allow techybuff.com to access the API
+CORS(app, resources={r"/api/*": {"origins": ["https://techybuff.com", "https://www.techybuff.com"]}})
 
+API_KEY = os.environ.get("TRANSCRIPT_API_KEY")
 
 def extract_video_id(url):
     patterns = [
@@ -24,19 +27,15 @@ def extract_video_id(url):
 
     return None
 
-
 @app.route("/")
 def home():
     return render_template("index.html")
-
 
 @app.route("/api/transcript", methods=["POST"])
 def transcript():
     try:
         data = request.get_json()
-
         url = data.get("url", "").strip()
-
         video_id = extract_video_id(url)
 
         if not video_id:
@@ -46,12 +45,10 @@ def transcript():
             })
 
         endpoint = "https://transcriptapi.com/api/v2/youtube/transcript"
-
         headers = {
             "Authorization": f"Bearer {API_KEY}",
             "Accept": "application/json"
         }
-
         params = {
             "video_url": f"https://youtu.be/{video_id}",
             "format": "json",
@@ -80,7 +77,6 @@ def transcript():
             })
 
         transcript_items = data["transcript"]
-
         transcript_text = "\n".join(
             item.get("text", "")
             for item in transcript_items
@@ -99,7 +95,6 @@ def transcript():
             "success": False,
             "message": str(e)
         }), 500
-
 
 if __name__ == "__main__":
     app.run(debug=True)
